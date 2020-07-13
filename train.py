@@ -18,6 +18,7 @@ parser.add_argument("--gpu", type=int, default=0)
 # parser.add_argument("--val_path",type=str, default='/home/aistudio/work/mini_Imagenet/dataset/val')
 parser.add_argument("--train_path", type=str, default='/Users/alex/baidu/mini_Imagenet/dataset/train')
 parser.add_argument("--val_path", type=str, default='/Users/alex/baidu/mini_Imagenet/dataset/val')
+parser.add_argument("--model_path", type=str, default='./model/best_accuracy')
 args = parser.parse_args()
 
 use_gpu = args.gpu
@@ -69,7 +70,7 @@ def train():
         if (episode + 1) % 100 == 0:
             print("episode:", episode + 1, "loss:", loss, 'acc:', sum(accs) / len(accs))
 
-        if episode % 5000 == 0:
+        if episode % 5000 == 0 and episode != 0:
             print("Testing...")
             accuracies = []
             test_reader = episode_reader(TEST_PATH,
@@ -99,9 +100,9 @@ def train():
 
             if test_accuracy > last_accuracy:
                 # save networks
-                if not os.path.exists('model'):
-                    os.makedirs('model')
-                fluid.save(main_program, './model/best_accuracy')
+                if not os.path.exists(args.model_path):
+                    os.makedirs(args.model_path)
+                fluid.save(main_program, args.model_path)
                 print("save networks for episode:", episode)
                 last_accuracy = test_accuracy
 
