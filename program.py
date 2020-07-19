@@ -15,8 +15,8 @@ def build(main_prog, startup_prog, mode, c_way, k_shot):
             embed_model = EmbeddingNet()
             RN_model = RelationNet()
 
-            sample_shape = fluid.layers.shape(sample_image)[0]
-            query_shape = fluid.layers.shape(query_image)[0]
+            sample_batch_size = fluid.layers.shape(sample_image)[0]
+            query_batch_size = fluid.layers.shape(query_image)[0]
 
             sample_query_image = fluid.layers.concat([sample_image, query_image], axis=0)
             sample_query_feature = embed_model.net(sample_query_image)
@@ -25,7 +25,7 @@ def build(main_prog, startup_prog, mode, c_way, k_shot):
                 sample_query_feature,
                 axes=[0],
                 starts=[0],
-                ends=[sample_shape])
+                ends=[sample_batch_size])
             if k_shot > 1:
             # few_shot
                 sample_feature = fluid.layers.reshape(sample_feature, shape=[c_way, k_shot, 64, 19, 19])
@@ -33,19 +33,19 @@ def build(main_prog, startup_prog, mode, c_way, k_shot):
             query_feature = fluid.layers.slice(
                 sample_query_feature,
                 axes=[0],
-                starts=[sample_shape],
-                ends=[sample_shape + query_shape])
+                starts=[sample_batch_size],
+                ends=[sample_batch_size + query_batch_size])
 
             sample_feature_ext = fluid.layers.unsqueeze(sample_feature, axes=0)
             query_shape = fluid.layers.concat(
-                [query_shape, fluid.layers.assign(np.array([1, 1, 1, 1]).astype('int32'))])
+                [query_batch_size, fluid.layers.assign(np.array([1, 1, 1, 1]).astype('int32'))])
             sample_feature_ext = fluid.layers.expand(sample_feature_ext, query_shape)
 
             query_feature_ext = fluid.layers.unsqueeze(query_feature, axes=0)
             if k_shot > 1:
-                sample_shape = sample_shape / float(k_shot)
+                sample_batch_size = sample_batch_size / float(k_shot)
             sample_shape = fluid.layers.concat(
-                [sample_shape, fluid.layers.assign(np.array([1, 1, 1, 1]).astype('int32'))])
+                [sample_batch_size, fluid.layers.assign(np.array([1, 1, 1, 1]).astype('int32'))])
             query_feature_ext = fluid.layers.expand(query_feature_ext, sample_shape)
 
             query_feature_ext = fluid.layers.transpose(query_feature_ext, [1, 0, 2, 3, 4])
