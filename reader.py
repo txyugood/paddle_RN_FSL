@@ -5,38 +5,47 @@ from PIL import Image
 from autoaugment import ImageNetPolicy
 import glob
 
-def get_class(sample):
-    return sample.split('/')[-2]
+
+def get_class(label_map, sample):
+    for c in label_map.keys():
+        if sample in label_map[c]:
+            return c
 def episode_reader(path, episode_num, support_class_num, support_shot_num, query_num, augment=False):
     # class_list = os.listdir(path)
-    class_list = glob.glob(path + '/n*')
-    class_list = [os.path.join(path, c) for c in class_list]
+    with open(os.path.join(path,'train_labels.csv'), 'r') as f:
+        lines = f.readlines()[1:]
+    label_map = {}
+    for line in lines:
+        image_path, label = line.strip().split(',')
+        if label in label_map.keys():
+            label_map[label] += [image_path]
+        else:
+            label_map[label] = [image_path]
+    class_list = label_map.keys()
+
     if augment:
         policy = ImageNetPolicy()
     def reader():
         for i in range(episode_num):
-            class_folders = random.sample(class_list, support_class_num)
-            labels = np.array(range(len(class_folders)))
-            labels = dict(zip([f.split('/')[-1] for f in class_folders], labels))
-            samples = dict()
+            labels = np.array(range(len(class_list)))
+            labels = dict(zip(class_list, labels))
 
             sample_roots = []
             query_roots = []
-            for c in class_folders:
-                temp = [os.path.join(c, x) for x in os.listdir(c)]
-                samples[c] = random.sample(temp, len(temp))
-                random.shuffle(samples[c])
+            for c in class_list:
+                random.shuffle(label_map[c])
 
-                sample_roots += samples[c][:support_shot_num]
-                query_roots += samples[c][support_shot_num:support_shot_num + query_num]
+                sample_roots += label_map[c][:support_shot_num]
+                query_roots += label_map[c][support_shot_num:support_shot_num + query_num]
 
             # np.random.shuffle(sample_roots)
             np.random.shuffle(query_roots)
-            sample_labels = [labels[get_class(x)] for x in sample_roots]
-            query_labels = [labels[get_class(x)] for x in query_roots]
+            sample_labels = [labels[get_class(label_map, x)] for x in sample_roots]
+            query_labels = [labels[get_class(label_map, x)] for x in query_roots]
             sample_img = []
             query_img = []
             for im_file in sample_roots:
+                im_file = os.path.join(path, 'images',im_file)
                 img = Image.open(im_file)
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
@@ -55,6 +64,7 @@ def episode_reader(path, episode_num, support_class_num, support_shot_num, query
                 sample_img.append(image.astype('float32'))
 
             for im_file in query_roots:
+                im_file = os.path.join(path, 'images', im_file)
                 img = Image.open(im_file)
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
@@ -74,3 +84,8 @@ def episode_reader(path, episode_num, support_class_num, support_shot_num, query
             yield sample_img, sample_labels, query_img, query_labels
 
     return reader
+
+if __name__ == '__main__':
+    reader = episode_reader("/Users/alex/Downloads/train", 10000, 4, 5, 10)
+    for d in reader():
+        pass
